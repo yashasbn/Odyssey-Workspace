@@ -130,9 +130,26 @@ async function loadModels() {
     state.model = els.modelSelect.value;
     updateTopbarModel();
     setStatus('online', `${models.length} model${models.length !== 1 ? 's' : ''} available`);
+    preloadModel(state.model);
   } catch (err) {
     toast('Could not load models. Is Ollama running?', 'error');
     setStatus('offline', 'Ollama offline');
+  }
+}
+
+async function preloadModel(modelName) {
+  if (!modelName) return;
+  setStatus('loading', `Activating ${modelName}…`);
+  try {
+    await fetchOllama('/api/generate', {
+      method: 'POST',
+      body: JSON.stringify({ model: modelName, prompt: '', stream: false }),
+    });
+    setStatus('online', `${modelName} ready`);
+    toast(`Model "${modelName}" is active and ready!`, 'success');
+  } catch (err) {
+    setStatus('offline', 'Activation failed');
+    toast(`Could not activate "${modelName}": ${err.message}`, 'error');
   }
 }
 
@@ -676,6 +693,7 @@ function initEventListeners() {
   els.modelSelect.addEventListener('change', () => {
     state.model = els.modelSelect.value;
     updateTopbarModel();
+    preloadModel(state.model);
   });
   els.refreshModels.addEventListener('click', loadModels);
 
