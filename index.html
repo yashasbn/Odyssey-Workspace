@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ollama Chat — Local AI Interface</title>
+  <meta name="description" content="A beautiful local AI chat interface powered by Ollama running in Docker." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="logo-text">Ollama<span class="logo-accent">Chat</span></span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" title="Collapse sidebar">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <!-- Model Selector -->
+    <div class="sidebar-section">
+      <label class="section-label">Model</label>
+      <div class="model-selector">
+        <div class="select-wrapper">
+          <select id="modelSelect">
+            <option value="" disabled selected>Loading models…</option>
+          </select>
+          <svg class="select-arrow" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <button class="icon-btn" id="refreshModels" title="Refresh models">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <!-- Status Indicator -->
+      <div class="status-bar" id="statusBar">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Connecting…</span>
+      </div>
+    </div>
+
+    <!-- Pull Model -->
+    <div class="sidebar-section">
+      <label class="section-label">Download a Model</label>
+
+      <!-- Curated model picker -->
+      <div class="select-wrapper" style="margin-bottom:8px">
+        <select id="pullModelSelect">
+          <option value="" disabled selected>Choose a model…</option>
+
+          <optgroup label="🔥 Popular">
+            <option value="llama3.2"       data-size="~2.0 GB">llama3.2 — Meta, general purpose</option>
+            <option value="llama3.2:1b"    data-size="~1.3 GB">llama3.2:1b — Meta, ultra-light</option>
+            <option value="mistral"        data-size="~4.1 GB">mistral — Mistral AI, smart &amp; fast</option>
+            <option value="gemma2:2b"      data-size="~1.6 GB">gemma2:2b — Google, lightweight</option>
+            <option value="gemma2:9b"      data-size="~5.4 GB">gemma2:9b — Google, high quality</option>
+          </optgroup>
+
+          <optgroup label="⚡ Small &amp; Fast (CPU-friendly)">
+            <option value="tinyllama"      data-size="~638 MB">tinyllama — Tiny but capable</option>
+            <option value="phi3:mini"      data-size="~2.3 GB">phi3:mini — Microsoft, very efficient</option>
+            <option value="phi3.5"         data-size="~2.2 GB">phi3.5 — Microsoft, latest</option>
+            <option value="qwen2:0.5b"     data-size="~352 MB">qwen2:0.5b — Alibaba, smallest</option>
+            <option value="qwen2:1.5b"     data-size="~934 MB">qwen2:1.5b — Alibaba, balanced</option>
+          </optgroup>
+
+          <optgroup label="💻 Coding">
+            <option value="codellama"      data-size="~3.8 GB">codellama — Meta, code generation</option>
+            <option value="deepseek-coder" data-size="~776 MB">deepseek-coder — Code specialist</option>
+            <option value="starcoder2:3b"  data-size="~1.7 GB">starcoder2:3b — BigCode, multi-lang</option>
+          </optgroup>
+
+          <optgroup label="🧠 Large &amp; Powerful">
+            <option value="llama3.1:8b"    data-size="~4.7 GB">llama3.1:8b — Meta, 8B params</option>
+            <option value="llama3.3"       data-size="~43 GB">llama3.3 — Meta, 70B (needs GPU)</option>
+            <option value="mixtral"        data-size="~26 GB">mixtral — Mistral MoE (needs GPU)</option>
+          </optgroup>
+
+          <optgroup label="✏️ Custom">
+            <option value="__custom__">Enter model name manually…</option>
+          </optgroup>
+        </select>
+        <svg class="select-arrow" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+
+      <!-- Model info badge -->
+      <div class="model-info-badge" id="modelInfoBadge" style="display:none">
+        <span id="modelInfoName"></span>
+        <span class="model-size-tag" id="modelInfoSize"></span>
+      </div>
+
+      <!-- Custom model name input (hidden unless __custom__ selected) -->
+      <div id="customModelWrapper" style="display:none; margin-bottom:8px">
+        <input type="text" id="pullModelInput" placeholder="e.g. llava, neural-chat" class="text-input" />
+      </div>
+
+      <button class="pull-btn" id="pullModelBtn">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Download Model
+      </button>
+
+      <div class="pull-progress" id="pullProgress" style="display:none">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <span class="progress-label" id="progressLabel">Starting…</span>
+      </div>
+    </div>
+
+    <!-- Conversation Settings -->
+    <div class="sidebar-section">
+      <label class="section-label">Options</label>
+      <div class="option-row">
+        <label class="option-label" for="streamToggle">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Stream responses
+        </label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="streamToggle" checked />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="option-row">
+        <label class="option-label" for="systemPromptToggle">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          System prompt
+        </label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="systemPromptToggle" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="system-prompt-wrapper" id="systemPromptWrapper" style="display:none">
+        <textarea id="systemPrompt" class="text-input" rows="4" placeholder="You are a helpful assistant…"></textarea>
+      </div>
+    </div>
+
+    <!-- Conversation History -->
+    <div class="sidebar-section conversations-section">
+      <label class="section-label">Chats</label>
+      <div class="conversations-list" id="conversationsList">
+        <!-- dynamically populated -->
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="new-chat-btn" id="newChatBtn">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        New Chat
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN AREA ══════════════════════════════════════════════════════════ -->
+  <main class="main" id="main">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <button class="icon-btn" id="sidebarOpen" title="Open sidebar" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="topbar-model" id="topbarModel">No model selected</div>
+      <button class="icon-btn danger" id="clearChatBtn" title="Clear conversation">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+
+    <!-- Messages -->
+    <div class="messages-container" id="messagesContainer">
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="40" r="38" stroke="url(#grad1)" stroke-width="2"/>
+            <path d="M24 40h32M40 24v32" stroke="url(#grad2)" stroke-width="3" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="grad1" x1="0" y1="0" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/>
+              </linearGradient>
+              <linearGradient id="grad2" x1="0" y1="0" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1 class="empty-title">Start a conversation</h1>
+        <p class="empty-subtitle">Select a model from the sidebar and ask anything.</p>
+        <div class="suggestion-chips" id="suggestionChips">
+          <button class="chip" data-prompt="Explain quantum computing in simple terms">⚛️ Quantum computing</button>
+          <button class="chip" data-prompt="Write a Python function to sort a list of dictionaries by a key">🐍 Python sorting</button>
+          <button class="chip" data-prompt="What are the best practices for REST API design?">🔌 REST API design</button>
+          <button class="chip" data-prompt="Give me a recipe for chocolate lava cake">🍫 Lava cake recipe</button>
+        </div>
+      </div>
+      <!-- Messages injected here -->
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+      <div class="input-wrapper">
+        <textarea
+          id="userInput"
+          class="user-input"
+          placeholder="Ask anything… (Enter to send, Shift+Enter for new line)"
+          rows="1"
+          id="userInput"
+        ></textarea>
+        <div class="input-actions">
+          <span class="char-counter" id="charCounter"></span>
+          <button class="send-btn" id="sendBtn" title="Send message" disabled>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="input-hint">Powered by <strong>Ollama</strong> · Running locally on Docker · Your data never leaves your machine</p>
+    </div>
+  </main>
+
+  <!-- ═══ TOAST ══════════════════════════════════════════════════════════════ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
