@@ -1,0 +1,60 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      # Allow requests from any origin
+      - OLLAMA_ORIGINS=*
+      # Bind to all interfaces inside container
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    # ─── GPU Support (NVIDIA) ───────────────────────────────────────────────
+    # Uncomment the block below if you have an NVIDIA GPU with drivers installed
+    # and the NVIDIA Container Toolkit set up.
+    #
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    # ────────────────────────────────────────────────────────────────────────
+
+  # Auto-pull models on startup
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: >
+      /bin/sh -c "
+        echo '>>> Pulling llama3.2 (general purpose, ~2GB)...' &&
+        ollama pull llama3.2 &&
+        echo '>>> Pulling gemma2:2b (lightweight Google model, ~1.6GB)...' &&
+        ollama pull gemma2:2b &&
+        echo '>>> Pulling tinyllama (ultra-fast, ~600MB)...' &&
+        ollama pull tinyllama &&
+        echo '>>> All models ready!'
+      "
+    restart: "no"
+
+volumes:
+  ollama_models:
+    driver: local

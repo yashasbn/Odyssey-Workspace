@@ -6,18 +6,31 @@ This project packages both the backend Ollama engine and a beautiful, glassmorph
 
 ---
 
-## Quick Start (Docker Compose)
+## Quick Start (Docker Compose Options)
 
-To start the entire application (both the Ollama engine and the web interface):
+### Option A: Start Full Stack (Web Chat UI + Ollama Backend)
+This builds and starts the frontend web server along with the Ollama container:
 
 ```bash
 docker-compose up -d --build
 ```
-
 - **Web Chat UI**: [http://localhost:3000](http://localhost:3000)
 - **Ollama REST API**: [http://localhost:11434](http://localhost:11434)
 
-On first startup, three models will automatically be pulled in the background:
+### Option B: Start Ollama Only (For CLI / Terminal Chatting)
+If you only want the Ollama engine without running the Nginx web frontend:
+
+```bash
+docker-compose -f docker-compose.llm.yml up -d
+```
+Once it's running, you can connect directly in your terminal using:
+```bash
+docker exec -it ollama ollama run llama3.2
+```
+
+---
+
+On first startup of either option, three models will automatically be pulled in the background:
 - `llama3.2` (Meta, 3B, general purpose)
 - `gemma2:2b` (Google, 2B, lightweight)
 - `tinyllama` (Ultra-fast, 1.1B, CPU-friendly)
