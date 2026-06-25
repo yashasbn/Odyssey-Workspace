@@ -1,4 +1,11 @@
 services:
+  web:
+    build: .
+    container_name: ollama-chat-web
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
