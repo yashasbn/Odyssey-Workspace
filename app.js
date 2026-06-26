@@ -17,6 +17,7 @@ let state = {
   activeConvId: null,
   isGenerating: false,
   abortController: null,
+  attachments: [],       // { name: string, type: string, content: string }
 };
 
 // ── DOM Refs ─────────────────────────────────────────────────────────────────
@@ -53,6 +54,10 @@ const els = {
   userInput:          $('userInput'),
   charCounter:        $('charCounter'),
   sendBtn:            $('sendBtn'),
+  stopBtn:            $('stopBtn'),
+  uploadBtn:          $('uploadBtn'),
+  fileInput:          $('fileInput'),
+  attachmentStrip:    $('attachmentStrip'),
   toastContainer:     $('toastContainer'),
   suggestionChips:    $('suggestionChips'),
 };
@@ -357,9 +362,43 @@ async function sendMessage(text) {
     return;
   }
 
+  // Build full content with attachments if present
+  let fullContent = text;
+  if (state.attachments.length > 0) {
+    let attachmentsText = "\n\n[Attachments]:\n";
+    state.attachments.forEach(att => {
+      if (att.type.startsWith('image/')) {
+        attachmentsText += `[Image: ${att.name} (Attached)]\n`;
+      } else {
+        attachmentsText += `[File: ${att.name}]\n\`\`\`\n${att.content}\n\`\`\`\n`;
+      }
+    });
+    fullContent += attachmentsText;
+  }
+
   // Add to state
-  state.messages.push({ role: 'user', content: text });
-  appendMessage('user', text);
+  state.messages.push({ role: 'user', content: fullContent });
+  appendMessage('user', text); // UI shows the original user query
+
+  // Render attachment info inside the last user message bubble if any
+  if (state.attachments.length > 0) {
+    const bubbles = els.messagesContainer.querySelectorAll('.message.user .bubble-content');
+    if (bubbles.length > 0) {
+      const lastBubble = bubbles[bubbles.length - 1];
+      const attDiv = document.createElement('div');
+      attDiv.style.marginTop = '8px';
+      attDiv.style.borderTop = '1px solid rgba(255,255,255,0.2)';
+      attDiv.style.paddingTop = '8px';
+      attDiv.style.fontSize = '0.8rem';
+      attDiv.style.opacity = '0.9';
+      attDiv.innerHTML = '<strong>Attached:</strong> ' + state.attachments.map(a => a.name).join(', ');
+      lastBubble.appendChild(attDiv);
+    }
+  }
+
+  // Clear attachments
+  state.attachments = [];
+  renderAttachments();
 
   // Reset input
   els.userInput.value = '';
@@ -372,9 +411,9 @@ async function sendMessage(text) {
   const useStream = state.streaming;
 
   if (useStream) {
-    await sendStreaming(text);
+    await sendStreaming(fullContent);
   } else {
-    await sendBlocking(text);
+    await sendBlocking(fullContent);
   }
 
   setGenerating(false);
@@ -465,7 +504,17 @@ function buildRequestBody(stream) {
     messages.push({ role: 'system', content: sysPrompt });
   }
 
-  messages.push(...state.messages);
+  // Send messages but also format images if any were sent directly (Ollama supports vision API)
+  const apiMessages = state.messages.map(msg => {
+    // If the message has base64 images extracted, Ollama /api/chat supports {"images": ["base64..."]}
+    // We search the attachments state (or could scan files)
+    return {
+      role: msg.role,
+      content: msg.content
+    };
+  });
+
+  messages.push(...apiMessages);
 
   return {
     model: state.model,
@@ -476,18 +525,14 @@ function buildRequestBody(stream) {
 
 function setGenerating(isGenerating) {
   state.isGenerating = isGenerating;
-  els.sendBtn.disabled = isGenerating || !els.userInput.value.trim();
-
+  
   if (isGenerating) {
-    els.sendBtn.classList.add('loading');
-    els.sendBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10"/></svg>`;
-    els.sendBtn.title = 'Stop generation';
-    els.sendBtn.onclick = stopGeneration;
+    els.sendBtn.style.display = 'none';
+    els.stopBtn.style.display = 'flex';
   } else {
-    els.sendBtn.classList.remove('loading');
-    els.sendBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    els.sendBtn.title = 'Send message';
-    els.sendBtn.onclick = null;
+    els.sendBtn.style.display = 'flex';
+    els.stopBtn.style.display = 'none';
+    els.sendBtn.disabled = !els.userInput.value.trim() && state.attachments.length === 0;
   }
 }
 
@@ -532,32 +577,34 @@ async function pullModel() {
 
       const lines = decoder.decode(value).split('\n').filter(Boolean);
       for (const line of lines) {
-        try {
-          const json = JSON.parse(line);
-          const status = json.status ?? '';
+        (async () => {
+          try {
+            const json = JSON.parse(line);
+            const status = json.status ?? '';
 
-          if (json.total && json.completed) {
-            const pct = Math.round((json.completed / json.total) * 100);
-            els.progressFill.style.width = `${pct}%`;
-            els.progressLabel.textContent = `${status} — ${pct}%`;
-          } else {
-            els.progressLabel.textContent = status;
-            // Animate progress bar indeterminately
-            els.progressFill.style.width = '60%';
-          }
+            if (json.total && json.completed) {
+              const pct = Math.round((json.completed / json.total) * 100);
+              els.progressFill.style.width = `${pct}%`;
+              els.progressLabel.textContent = `${status} — ${pct}%`;
+            } else {
+              els.progressLabel.textContent = status;
+              // Animate progress bar indeterminately
+              els.progressFill.style.width = '60%';
+            }
 
-          if (status === 'success') {
-            els.progressFill.style.width = '100%';
-            els.progressLabel.textContent = '✓ Download complete!';
-            toast(`Model "${modelName}" pulled successfully!`, 'success');
-            await loadModels();
-            els.pullModelInput.value = '';
-            els.pullModelSelect.value = '';
-            els.customModelWrapper.style.display = 'none';
-            els.modelInfoBadge.style.display = 'none';
-            setTimeout(() => { els.pullProgress.style.display = 'none'; }, 2000);
-          }
-        } catch { /* ignore */ }
+            if (status === 'success') {
+              els.progressFill.style.width = '100%';
+              els.progressLabel.textContent = '✓ Download complete!';
+              toast(`Model "${modelName}" pulled successfully!`, 'success');
+              await loadModels();
+              els.pullModelInput.value = '';
+              els.pullModelSelect.value = '';
+              els.customModelWrapper.style.display = 'none';
+              els.modelInfoBadge.style.display = 'none';
+              setTimeout(() => { els.pullProgress.style.display = 'none'; }, 2000);
+            }
+          } catch { /* ignore */ }
+        })();
       }
     }
   } catch (err) {
@@ -749,7 +796,7 @@ function initEventListeners() {
     autoResize(els.userInput);
     const len = els.userInput.value.length;
     els.charCounter.textContent = len > 100 ? `${len}` : '';
-    els.sendBtn.disabled = !els.userInput.value.trim() || state.isGenerating;
+    els.sendBtn.disabled = (!els.userInput.value.trim() && state.attachments.length === 0) || state.isGenerating;
   });
 
   els.userInput.addEventListener('keydown', e => {
@@ -764,6 +811,16 @@ function initEventListeners() {
     if (!state.isGenerating) sendMessage(els.userInput.value);
   });
 
+  // Stop button
+  els.stopBtn.addEventListener('click', stopGeneration);
+
+  // File Upload Handlers
+  els.uploadBtn.addEventListener('click', () => {
+    els.fileInput.click();
+  });
+
+  els.fileInput.addEventListener('change', handleFileSelect);
+
   // Suggestion chips
   els.suggestionChips?.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -774,6 +831,76 @@ function initEventListeners() {
     });
   });
 }
+
+function handleFileSelect(e) {
+  const files = Array.from(e.target.files);
+  files.forEach(file => {
+    const reader = new FileReader();
+    
+    if (file.type.startsWith('image/')) {
+      reader.onload = function(evt) {
+        state.attachments.push({
+          name: file.name,
+          type: file.type,
+          content: evt.target.result // base64 DataURL
+        });
+        renderAttachments();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = function(evt) {
+        state.attachments.push({
+          name: file.name,
+          type: file.type,
+          content: evt.target.result // text content
+        });
+        renderAttachments();
+      };
+      reader.readAsText(file);
+    }
+  });
+  
+  // reset file input
+  els.fileInput.value = '';
+}
+
+function renderAttachments() {
+  if (state.attachments.length === 0) {
+    els.attachmentStrip.style.display = 'none';
+    els.attachmentStrip.innerHTML = '';
+    els.sendBtn.disabled = !els.userInput.value.trim();
+    return;
+  }
+
+  els.attachmentStrip.style.display = 'flex';
+  els.attachmentStrip.innerHTML = '';
+
+  state.attachments.forEach((att, idx) => {
+    const div = document.createElement('div');
+    div.className = 'attachment-preview';
+    
+    if (att.type.startsWith('image/')) {
+      div.innerHTML = `
+        <img src="${att.content}" alt="${att.name}" />
+        <span>${att.name}</span>
+        <button class="remove-btn" onclick="removeAttachment(${idx})">✕</button>
+      `;
+    } else {
+      div.innerHTML = `
+        <span>📄 ${att.name}</span>
+        <button class="remove-btn" onclick="removeAttachment(${idx})">✕</button>
+      `;
+    }
+    els.attachmentStrip.appendChild(div);
+  });
+
+  els.sendBtn.disabled = false;
+}
+
+window.removeAttachment = function(index) {
+  state.attachments.splice(index, 1);
+  renderAttachments();
+};
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {

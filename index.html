@@ -210,16 +210,31 @@
 
     <!-- Input Area -->
     <div class="input-area">
+      <!-- Attachment preview strip -->
+      <div class="attachment-strip" id="attachmentStrip" style="display:none"></div>
+
       <div class="input-wrapper">
+        <!-- Hidden file input -->
+        <input type="file" id="fileInput" accept="image/*,.txt,.md,.js,.ts,.py,.json,.csv,.html,.css" style="display:none" multiple />
+
+        <!-- Upload button -->
+        <button class="upload-btn" id="uploadBtn" title="Attach file or image">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+
         <textarea
           id="userInput"
           class="user-input"
           placeholder="Ask anything… (Enter to send, Shift+Enter for new line)"
           rows="1"
-          id="userInput"
         ></textarea>
         <div class="input-actions">
           <span class="char-counter" id="charCounter"></span>
+          <!-- Stop button (visible only during generation) -->
+          <button class="stop-btn" id="stopBtn" title="Stop generation" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+            Stop
+          </button>
           <button class="send-btn" id="sendBtn" title="Send message" disabled>
             <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>

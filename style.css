@@ -886,6 +886,117 @@ body {
   to { transform: rotate(360deg); }
 }
 
+.upload-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+.upload-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.upload-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.stop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  padding: 0 16px;
+  height: 38px;
+  border-radius: 19px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px var(--danger-glow);
+}
+
+.stop-btn:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.stop-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.attachment-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+}
+
+.attachment-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 30px 6px 10px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  max-width: 220px;
+}
+
+.attachment-preview span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-preview img {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.attachment-preview .remove-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attachment-preview .remove-btn:hover {
+  color: var(--danger);
+}
+
 .input-hint {
   text-align: center;
   font-size: 0.75rem;
