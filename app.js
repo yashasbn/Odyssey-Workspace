@@ -596,12 +596,13 @@ async function pullModel() {
               els.progressFill.style.width = '100%';
               els.progressLabel.textContent = '✓ Download complete!';
               toast(`Model "${modelName}" pulled successfully!`, 'success');
-              await loadModels();
-              els.pullModelInput.value = '';
-              els.pullModelSelect.value = '';
-              els.customModelWrapper.style.display = 'none';
-              els.modelInfoBadge.style.display = 'none';
-              setTimeout(() => { els.pullProgress.style.display = 'none'; }, 2000);
+              loadModels().then(() => {
+                els.pullModelInput.value = '';
+                els.pullModelSelect.value = '';
+                els.customModelWrapper.style.display = 'none';
+                els.modelInfoBadge.style.display = 'none';
+                setTimeout(() => { els.pullProgress.style.display = 'none'; }, 2000);
+              });
             }
           } catch { /* ignore */ }
         })();
