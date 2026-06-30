@@ -51,7 +51,7 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=ollama:11434
     entrypoint: >
       /bin/sh -c "
         echo '>>> Pulling llama3.2 (general purpose, ~2GB)...' &&

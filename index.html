@@ -12,6 +12,25 @@
 </head>
 <body>
 
+  <!-- ═══ LOADING OVERLAY ══════════════════════════════════════════════════ -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="loading-logo">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2 class="loading-title">OllamaChat</h2>
+      <p class="loading-subtitle" id="loadingSubtitle">Connecting to Ollama…</p>
+      <div class="loading-spinner">
+        <div class="spinner-ring"></div>
+      </div>
+      <p class="loading-hint" id="loadingHint">Loading model into memory. This only happens once.</p>
+    </div>
+  </div>
+
   <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════════ -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">

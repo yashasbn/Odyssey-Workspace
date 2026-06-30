@@ -60,6 +60,9 @@ const els = {
   attachmentStrip:    $('attachmentStrip'),
   toastContainer:     $('toastContainer'),
   suggestionChips:    $('suggestionChips'),
+  loadingOverlay:     $('loadingOverlay'),
+  loadingSubtitle:    $('loadingSubtitle'),
+  loadingHint:        $('loadingHint'),
 };
 
 // ── Toast Notifications ──────────────────────────────────────────────────────
@@ -129,33 +132,43 @@ async function loadModels() {
       els.modelSelect.appendChild(opt);
     });
 
-    // prefer llama3.2 if available, else first
-    const preferred = models.find(m => m.name.startsWith('llama3.2'));
+    // prefer tinyllama (fastest on CPU), else llama3.2, else first
+    const preferred = models.find(m => m.name.startsWith('tinyllama')) || models.find(m => m.name.startsWith('llama3.2'));
     els.modelSelect.value = preferred ? preferred.name : models[0].name;
     state.model = els.modelSelect.value;
     updateTopbarModel();
     setStatus('online', `${models.length} model${models.length !== 1 ? 's' : ''} available`);
-    preloadModel(state.model);
+    warmupModel(state.model); // silently preload into RAM
   } catch (err) {
     toast('Could not load models. Is Ollama running?', 'error');
     setStatus('offline', 'Ollama offline');
   }
 }
 
-async function preloadModel(modelName) {
+// ── Silent Background Warmup ──────────────────────────────────────────────────
+// Returns a Promise that resolves when the model is loaded into RAM.
+function warmupModel(modelName) {
+  if (!modelName) return Promise.resolve();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+  return fetch(`${OLLAMA_BASE}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: modelName, prompt: '', stream: false }),
+    signal: controller.signal,
+  })
+    .then(() => clearTimeout(timer))
+    .catch(() => clearTimeout(timer));
+}
+
+// Shows the loading overlay, warms up the model, then hides the overlay.
+async function showWarmupOverlay(modelName) {
   if (!modelName) return;
-  setStatus('loading', `Activating ${modelName}…`);
-  try {
-    await fetchOllama('/api/generate', {
-      method: 'POST',
-      body: JSON.stringify({ model: modelName, prompt: '', stream: false }),
-    });
-    setStatus('online', `${modelName} ready`);
-    toast(`Model "${modelName}" is active and ready!`, 'success');
-  } catch (err) {
-    setStatus('offline', 'Activation failed');
-    toast(`Could not activate "${modelName}": ${err.message}`, 'error');
-  }
+  els.loadingSubtitle.textContent = `Switching to ${modelName}…`;
+  els.loadingHint.textContent = 'Loading model into memory. This only happens once per session.';
+  els.loadingOverlay.classList.remove('hidden');
+  await warmupModel(modelName);
+  els.loadingOverlay.classList.add('hidden');
 }
 
 // ── Markdown Renderer ─────────────────────────────────────────────────────────
@@ -577,35 +590,33 @@ async function pullModel() {
 
       const lines = decoder.decode(value).split('\n').filter(Boolean);
       for (const line of lines) {
-        (async () => {
-          try {
-            const json = JSON.parse(line);
-            const status = json.status ?? '';
+        try {
+          const json = JSON.parse(line);
+          const status = json.status ?? '';
 
-            if (json.total && json.completed) {
-              const pct = Math.round((json.completed / json.total) * 100);
-              els.progressFill.style.width = `${pct}%`;
-              els.progressLabel.textContent = `${status} — ${pct}%`;
-            } else {
-              els.progressLabel.textContent = status;
-              // Animate progress bar indeterminately
-              els.progressFill.style.width = '60%';
-            }
+          if (json.total && json.completed) {
+            const pct = Math.round((json.completed / json.total) * 100);
+            els.progressFill.style.width = `${pct}%`;
+            els.progressLabel.textContent = `${status} — ${pct}%`;
+          } else {
+            els.progressLabel.textContent = status;
+            // Animate progress bar indeterminately
+            els.progressFill.style.width = '60%';
+          }
 
-            if (status === 'success') {
-              els.progressFill.style.width = '100%';
-              els.progressLabel.textContent = '✓ Download complete!';
-              toast(`Model "${modelName}" pulled successfully!`, 'success');
-              loadModels().then(() => {
-                els.pullModelInput.value = '';
-                els.pullModelSelect.value = '';
-                els.customModelWrapper.style.display = 'none';
-                els.modelInfoBadge.style.display = 'none';
-                setTimeout(() => { els.pullProgress.style.display = 'none'; }, 2000);
-              });
-            }
-          } catch { /* ignore */ }
-        })();
+          if (status === 'success') {
+            els.progressFill.style.width = '100%';
+            els.progressLabel.textContent = '✓ Download complete!';
+            toast(`Model "${modelName}" pulled successfully!`, 'success');
+            loadModels().then(() => {
+              els.pullModelInput.value = '';
+              els.pullModelSelect.value = '';
+              els.customModelWrapper.style.display = 'none';
+              els.modelInfoBadge.style.display = 'none';
+              setTimeout(() => { els.pullProgress.style.display = 'none'; }, 2000);
+            });
+          }
+        } catch { /* ignore */ }
       }
     }
   } catch (err) {
@@ -741,7 +752,8 @@ function initEventListeners() {
   els.modelSelect.addEventListener('change', () => {
     state.model = els.modelSelect.value;
     updateTopbarModel();
-    preloadModel(state.model);
+    setStatus('online', `${state.model} selected`);
+    showWarmupOverlay(state.model); // show overlay until new model is in RAM
   });
   els.refreshModels.addEventListener('click', loadModels);
 
@@ -908,13 +920,33 @@ async function init() {
   initEventListeners();
   loadFromLocalStorage();
 
+  // Phase 1: Connect
+  els.loadingSubtitle.textContent = 'Connecting to Ollama…';
+  els.loadingHint.textContent = 'Make sure Docker is running.';
+
   const ok = await checkOllamaStatus();
-  if (ok) {
-    await loadModels();
-  } else {
+  if (!ok) {
+    els.loadingSubtitle.textContent = 'Cannot reach Ollama';
+    els.loadingHint.textContent = 'Start Docker and refresh the page.';
     toast('Cannot reach Ollama at localhost:11434. Make sure Docker is running.', 'error', 6000);
     els.modelSelect.innerHTML = '<option value="" disabled selected>Ollama offline</option>';
+    return; // leave overlay visible as an error screen
   }
+
+  // Phase 2: Load model list
+  els.loadingSubtitle.textContent = 'Loading models…';
+  els.loadingHint.textContent = 'Fetching available models from Ollama.';
+  await loadModels();
+
+  // Phase 3: Warm up selected model
+  if (state.model) {
+    els.loadingSubtitle.textContent = `Warming up ${state.model}…`;
+    els.loadingHint.textContent = 'Loading model into memory. This only happens once.';
+    await warmupModel(state.model);
+  }
+
+  // Done — fade out overlay
+  els.loadingOverlay.classList.add('hidden');
 }
 
 document.addEventListener('DOMContentLoaded', init);
